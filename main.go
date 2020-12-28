@@ -21,23 +21,32 @@ type Pessoa struct {
 
 // Busca retorna uma lista de Pessoas pelos dados do banco
 func Busca(db *sql.DB, q string) (map[int]Pessoa, error) {
+
+	// Cria um Map para as pessoas cadastras, onde a chave é o ID
 	pessoas := make(map[int]Pessoa)
 
+	// Realiza a query e verifica caso tenho ocorrio um erro, caso tenha ocorrido o erro é retornado
 	result, err := db.Query(q)
 	if err != nil {
 		return pessoas, err
 	}
+	// Garante que "result" sera fechado ao final da função
 	defer result.Close()
 
+	// Percorre os valores do resultado e adicionar na lista
 	for result.Next() {
 		var id int
 		p := Pessoa{}
+		// Scan pega os valores das coluna, e passa para um valor,
+		// No caso é prenchido os dados da pessoa junto ao seu id
 		err = result.Scan(&p.Nome, &p.Idade, &p.Cpf, &id)
 		if err != nil {
 			return pessoas, err
 		}
 		pessoas[id] = p
 	}
+
+	// Fecha "result" e verifica caso tenho ocorrido um erro
 	err = result.Close()
 	if err != nil {
 		return pessoas, err
@@ -47,11 +56,16 @@ func Busca(db *sql.DB, q string) (map[int]Pessoa, error) {
 
 // Cadastrar faz o cadastro de uma pessoa no banco de dados
 func Cadastrar(db *sql.DB, p Pessoa) error {
+	// Prepara um INSERT de a ser executado para cadastrar o usuario
 	stmt, err := db.Prepare("INSERT INTO Pessoas (nome, idade, cpf) VALUES (?, ?, ?)")
 	if err != nil {
 		return err
 	}
+
+	// Garante que "stmt" sera fechado
 	defer stmt.Close()
+
+	// Executa a query antes preparada
 	_, err = stmt.Exec(p.Nome, p.Idade, p.Cpf)
 	if err != nil {
 		return err
@@ -85,29 +99,29 @@ func GetIdade(input *bufio.Scanner) int {
 
 // FormatCPF Formata o CPF para formato aceitado
 func FormatCPF(c string) string {
-	isIn := func(s string) bool {
-		nuns := "01213456789"
-		return strings.Contains(nuns, s)
-	}
+	nuns := "01213456789"
+
 	// New String
 	var NS []string
+
+	// Remove todos os simbulos não numeros
 	for _, v := range c {
-		if isIn(string(v)) {
+		if strings.Contains(nuns, string(v)) {
 			NS = append(NS, string(v))
 		}
 	}
+
+	// Concatena a lista de Strings em uma String unica
 	cpf := strings.Join(NS, "")
 	return cpf
 }
 
 // CPFExiste verifica se o CPF já foi cadastrado
 func CPFExiste(db *sql.DB, cpf string) bool {
-	var i int = -1
+	// Resgata do banco alguma linha que possua o CPF, caso n tenho um erro é retorando.
+	var i int
 	err := db.QueryRow("SELECT id FROM Pessoas WHERE cpf = ?", cpf).Scan(&i)
 	if err != nil {
-		i = -1
-	}
-	if i == -1 {
 		return false
 	}
 	return true
@@ -117,12 +131,14 @@ func CPFExiste(db *sql.DB, cpf string) bool {
 func GetCpf(db *sql.DB, input *bufio.Scanner) string {
 	fmt.Print("Digite o seu CPF sem pontos ou traços: ")
 	input.Scan()
+
+	// Formata o CPF dado pelo usuario para remover os simbulos n numeros
 	cpf := FormatCPF(input.Text())
 
+	// Verifica se o CPF já foi cadastrado
 	if !CPFExiste(db, cpf) {
 		return cpf
 	}
-
 	fmt.Println("CPF já cadastro, tente novamente")
 	return GetCpf(db, input)
 }
@@ -176,5 +192,4 @@ func main() {
 	} else {
 		fmt.Println("Não a cadastros")
 	}
-
 }
